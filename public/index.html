@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDF Viewer</title>
+    <style>
+        body { margin: 0; padding: 0; background: #525659; font-family: sans-serif; overflow: auto; }
+        
+        /* Loading State */
+        #loader { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%);
+            color: white; 
+            font-size: 20px; 
+            text-align: center;
+        }
+
+        /* Error State */
+        #error-msg { 
+            display: none;
+            color: #ff6b6b; 
+            text-align: center; 
+            padding: 20px; 
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            transform: translateY(-50%);
+        }
+
+        /* PDF Container */
+        #pdf-container { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 10px; 
+        }
+        
+        canvas { 
+            max-width: 100%; 
+            height: auto; 
+            margin-bottom: 10px; 
+            background: white; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5); 
+        }
+    </style>
+
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+
+    <div id="loader">Loading PDF...</div>
+    <div id="error-msg">Invalid URL or unable to load PDF.</div>
+    <div id="pdf-container"></div>
+
+    <script>
+        // Configure PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        const container = document.getElementById('pdf-container');
+        const loader = document.getElementById('loader');
+        const errorMsg = document.getElementById('error-msg');
+
+        // 1. Get URL from address bar
+        const urlParams = new URLSearchParams(window.location.search);
+        const pdfUrl = urlParams.get('url');
+
+        // 2. Logic to render PDF
+        async function renderPdf(url) {
+            try {
+                // Point to our proxy
+                const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
+
+                // Load PDF
+                const pdf = await pdfjsLib.getDocument(proxyUrl).promise;
+                loader.style.display = 'none';
+
+                // Render all pages
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const viewport = page.getViewport({ scale: 1.5 }); // Scale 1.5 for better mobile quality
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    canvas.height = viewport.height;
+                    canvas.width = viewport.width;
+
+                    await page.render({
+                        canvasContext: context,
+                        viewport: viewport
+                    }).promise;
+
+                    container.appendChild(canvas);
+                }
+
+            } catch (error) {
+                loader.style.display = 'none';
+                errorMsg.style.display = 'block';
+                console.error("Error:", error);
+            }
+        }
+
+        // 3. Initialize on load
+        if (pdfUrl) {
+            renderPdf(pdfUrl);
+        } else {
+            loader.style.display = 'none';
+            errorMsg.innerHTML = "No URL provided.<br><br>Usage: <br><code style='background:#333;padding:5px;border-radius:4px;'>?url=YOUR_PDF_LINK_HERE</code>";
+            errorMsg.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

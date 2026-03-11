@@ -1,5 +1,6 @@
 {
-    "routes": [
-      { "src": "/view/(.*)", "dest": "/view/index.html" }
+    "rewrites": [
+      { "source": "/proxy", "destination": "/api/proxy" },
+      { "source": "/", "destination": "/public/index.html" }
     ]
   }
