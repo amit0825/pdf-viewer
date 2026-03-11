@@ -1,8 +1,5 @@
 {
     "routes": [
-      {
-        "src": "/api/pdf",
-        "dest": "/api/pdf.js"
-      }
+      { "src": "/view/(.*)", "dest": "/view/index.html" }
     ]
   }
