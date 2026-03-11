@@ -1,10 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
 <title>PDF Viewer</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -15,30 +12,12 @@ body{
 margin:0;
 font-family:Arial;
 background:#1e1e1e;
-color:white;
-display:flex;
-flex-direction:column;
-height:100vh;
-}
-
-header{
-height:50px;
-background:#2d2d2d;
-display:flex;
-align-items:center;
-justify-content:space-between;
-padding:0 20px;
-border-bottom:1px solid #444;
 }
 
 #viewer{
-flex:1;
-overflow:auto;
 display:flex;
 justify-content:center;
-padding:40px 0;
-background-image: radial-gradient(#333 1px, transparent 1px);
-background-size:20px 20px;
+padding:40px;
 }
 
 #pages{
@@ -47,43 +26,23 @@ flex-direction:column;
 gap:40px;
 }
 
-.page{
+canvas{
 background:white;
-box-shadow:0 10px 20px rgba(0,0,0,0.6);
+box-shadow:0 8px 20px rgba(0,0,0,0.5);
 }
 
-button{
-background:none;
-border:none;
+header{
+background:#2d2d2d;
 color:white;
-font-size:16px;
-cursor:pointer;
-padding:6px 10px;
-}
-
-button:hover{
-background:#444;
+padding:10px 20px;
 }
 
 </style>
-
 </head>
 
 <body>
 
-<header>
-
-<div>PDF Viewer</div>
-
-<div>
-
-<button onclick="zoomOut()">-</button>
-<span id="zoom">100%</span>
-<button onclick="zoomIn()">+</button>
-
-</div>
-
-</header>
+<header>PDF Viewer</header>
 
 <div id="viewer">
 <div id="pages"></div>
@@ -94,123 +53,58 @@ background:#444;
 pdfjsLib.GlobalWorkerOptions.workerSrc =
 "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-let pdfDoc=null;
-let scale=1.2;
-let renderedPages=new Set();
+const pagesContainer = document.getElementById("pages");
 
-const pagesContainer=document.getElementById("pages");
+function getPDFUrl(){
 
-function getPDF(){
+const params = new URLSearchParams(window.location.search);
+const file = params.get("file");
 
-const params=new URLSearchParams(window.location.search);
-const file=params.get("file");
-
-if(!file) throw new Error("Missing PDF URL");
+if(!file){
+alert("Missing PDF URL");
+throw new Error("No file param");
+}
 
 return decodeURIComponent(file);
 
 }
 
-const PDF_URL=getPDF();
+const originalUrl = getPDFUrl();
+
+/*
+IMPORTANT
+We load the PDF through our proxy API
+*/
+
+const PDF_URL = "/api/pdf?url=" + encodeURIComponent(originalUrl);
+
+let pdfDoc = null;
+let scale = 1.2;
 
 async function init(){
 
-pdfDoc=await pdfjsLib.getDocument(PDF_URL).promise;
+pdfDoc = await pdfjsLib.getDocument(PDF_URL).promise;
 
-for(let i=1;i<=pdfDoc.numPages;i++){
+for(let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++){
 
-const placeholder=document.createElement("div");
-placeholder.className="page";
-placeholder.dataset.page=i;
-placeholder.style.height="1200px";
-placeholder.style.width="900px";
+const page = await pdfDoc.getPage(pageNum);
 
-pagesContainer.appendChild(placeholder);
+const viewport = page.getViewport({ scale });
 
-}
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");
 
-observePages();
+canvas.width = viewport.width;
+canvas.height = viewport.height;
 
-}
-
-async function renderPage(pageNumber,element){
-
-if(renderedPages.has(pageNumber)) return;
-
-const page=await pdfDoc.getPage(pageNumber);
-
-const viewport=page.getViewport({scale});
-
-const canvas=document.createElement("canvas");
-
-canvas.width=viewport.width;
-canvas.height=viewport.height;
-
-element.innerHTML="";
-element.appendChild(canvas);
+pagesContainer.appendChild(canvas);
 
 await page.render({
-canvasContext:canvas.getContext("2d"),
+canvasContext: ctx,
 viewport
 }).promise;
 
-renderedPages.add(pageNumber);
-
 }
-
-function observePages(){
-
-const observer=new IntersectionObserver(entries=>{
-
-entries.forEach(entry=>{
-
-if(entry.isIntersecting){
-
-const pageNumber=parseInt(entry.target.dataset.page);
-
-renderPage(pageNumber,entry.target);
-
-}
-
-});
-
-},{rootMargin:"800px"});
-
-document.querySelectorAll(".page").forEach(p=>observer.observe(p));
-
-}
-
-function zoomIn(){
-
-if(scale>=3) return;
-
-scale+=0.25;
-
-document.getElementById("zoom").innerText=Math.round(scale*100)+"%";
-
-reload();
-
-}
-
-function zoomOut(){
-
-if(scale<=0.5) return;
-
-scale-=0.25;
-
-document.getElementById("zoom").innerText=Math.round(scale*100)+"%";
-
-reload();
-
-}
-
-function reload(){
-
-renderedPages.clear();
-
-pagesContainer.innerHTML="";
-
-init();
 
 }
 
